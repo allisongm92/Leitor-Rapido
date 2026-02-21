@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="pt-PT" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Reader Pro">
+    <title>Speed Reader RSVP Liquid Glass</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+    <style>
+        /* Variáveis Liquid Glass (iOS 26) */
+        :root[data-theme="dark"] { 
+            --bg-color: #000;
+            --text-dim: rgba(255, 255, 255, 0.55); 
+            --text-main: #FFFFFF; 
+            --accent: #0A84FF; 
+            --guide: rgba(255, 255, 255, 0.1); 
+            --glass-base: rgba(30, 30, 35, 0.45);
+            --glass-panel: rgba(50, 50, 55, 0.35);
+            --border-specular: rgba(255, 255, 255, 0.15);
+            --shadow-inset: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+            --bg-gradient: radial-gradient(circle at 20% 30%, #1a1a24 0%, transparent 50%), radial-gradient(circle at 80% 80%, #0d1b2a 0%, transparent 50%);
+        }
+        :root[data-theme="sepia"] { 
+            --bg-color: #F4E8D1;
+            --text-dim: #9C8F79; 
+            --text-main: #3D342B; 
+            --accent: #D06014; 
+            --guide: rgba(0, 0, 0, 0.05); 
+            --glass-base: rgba(250, 243, 227, 0.6);
+            --glass-panel: rgba(255, 255, 255, 0.5);
+            --border-specular: rgba(255, 255, 255, 0.6);
+            --shadow-inset: inset 0 1px 2px rgba(255, 255, 255, 0.8);
+            --bg-gradient: radial-gradient(circle at 20% 30%, #fbebd5 0%, transparent 50%), radial-gradient(circle at 80% 80%, #e8dbbc 0%, transparent 50%);
+        }
+        :root[data-theme="light"] { 
+            --bg-color: #F2F2F7;
+            --text-dim: rgba(0, 0, 0, 0.5); 
+            --text-main: #000000; 
+            --accent: #007AFF; 
+            --guide: rgba(0, 0, 0, 0.05); 
+            --glass-base: rgba(255, 255, 255, 0.6);
+            --glass-panel: rgba(255, 255, 255, 0.5);
+            --border-specular: rgba(255, 255, 255, 0.8);
+            --shadow-inset: inset 0 1px 2px rgba(255, 255, 255, 0.9);
+            --bg-gradient: radial-gradient(circle at 20% 30%, #ffffff 0%, transparent 50%), radial-gradient(circle at 80% 80%, #e2e2ec 0%, transparent 50%);
+        }
+
+        * { box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background-color: var(--bg-color); color: var(--text-main);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", Roboto, sans-serif;
+            margin: 0; height: 100dvh; overflow: hidden;
+            display: flex; flex-direction: column; position: relative;
+            user-select: none; -webkit-user-select: none;
+            transition: background-color 0.5s ease, color 0.5s ease;
+            padding-top: env(safe-area-inset-top);
+        }
+
+        /* Fundo Dinâmico para o Liquid Glass poder refratar */
+        #ambient-bg {
+            position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; z-index: -1;
+            background-image: var(--bg-gradient);
+            animation: ambientDrift 30s ease-in-out infinite alternate;
+            opacity: 0.8;
+        }
+        @keyframes ambientDrift { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(5%, 5%) scale(1.1); } }
+
+        /* Liquid Glass Lensing Effect (Base Mixin) */
+        .liquid-glass {
+            background: var(--glass-base);
+            backdrop-filter: blur(50px) saturate(250%); -webkit-backdrop-filter: blur(50px) saturate(250%);
+            border: 0.5px solid var(--border-specular);
+            box-shadow: var(--shadow-inset), 0 10px 30px rgba(0,0,0,0.15);
+        }
+
+        #hud-top {
+            padding: 12px 20px; color: var(--text-main); font-size: 13px; font-weight: 600;
+            display: flex; justify-content: space-between; align-items: center; z-index: 10;
+            border-bottom-left-radius: 24px; border-bottom-right-radius: 24px;
+            margin: 0 10px; /* Floating Top Island */
+        }
+        
+        #current-chapter-title {
+            flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+            margin-right: 15px; font-weight: 700; color: var(--text-dim); letter-spacing: -0.2px;
+        }
+
+        .icon-btn { 
+            background: transparent; border: none; color: var(--text-main); 
+            padding: 8px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1), background 0.2s;
+        }
+        .icon-btn:active { background: var(--glass-panel); transform: scale(0.9); }
+        .icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+        
+        #stage { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-direction: column;}
+
+        .guide-line { position: absolute; width: 2px; height: 12px; background: var(--text-dim); left: 50%; transform: translateX(-50%); border-radius: 2px; pointer-events: none; opacity: 0.3;}
+        .guide-top { top: 38%; } .guide-bottom { bottom: 38%; }
+
+        #word-container {
+            font-size: clamp(2rem, var(--font-size, 11vw), 6rem); 
+            font-family: var(--font-family, 'Menlo', monospace);
+            line-height: 1; white-space: nowrap; display: flex; align-items: baseline; will-change: contents, transform; 
+            transition: opacity 0.3s ease, transform 0.05s linear; transform-origin: center center;
+            pointer-events: none; width: 100%; justify-content: center; letter-spacing: -1px; 
+            text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .segment { display: inline-block; transition: color 0.15s ease; }
+        .prefix { color: var(--text-main); text-align: right; width: 45vw; padding-right: 2px; opacity: 0.85;}
+        .orp { color: var(--accent); font-weight: 700; width: auto; text-align: center; }
+        .suffix { color: var(--text-main); text-align: left; width: 45vw; padding-left: 2px; opacity: 0.85;}
+
+        body[data-align="edge"] .guide-line { display: none; }
+        body[data-align="edge"] #word-container { justify-content: flex-start; padding-left: 10vw; width: auto;}
+        body[data-align="edge"] .prefix, body[data-align="edge"] .suffix { display: none; }
+        body[data-align="edge"] .orp { color: var(--text-main); font-weight: 500; text-align: left; }
+
+        #context-view {
+            position: absolute; top: 55%; width: 90%; max-width: 500px;
+            font-size: 1.15rem; line-height: 1.5; color: var(--text-dim);
+            text-align: center; white-space: normal;
+            opacity: 0; pointer-events: none; transition: all 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+            z-index: 30; transform: translateY(15px) scale(0.98);
+        }
+        #context-view.active { opacity: 1; pointer-events: auto; transform: translateY(0) scale(1); }
+        
+        .context-word { cursor: pointer; padding: 2px 4px; border-radius: 8px; transition: color 0.2s; display: inline-block;}
+        .context-word:active { color: var(--accent); }
+        .context-highlight { color: var(--text-main); font-weight: 600; border-bottom: 2px solid var(--accent); }
+
+        .touch-zone { position: absolute; top: 0; bottom: 0; z-index: 20; cursor: pointer; }
+        #zone-left { left: 0; width: 30%; } #zone-center { left: 30%; width: 40%; } #zone-right { right: 0; width: 30%; }
+
+        .flash { animation: flashAnim 0.2s ease-out; }
+        @keyframes flashAnim { 0% { background: rgba(255, 255, 255, 0.05); } 100% { background: transparent; } }
+
+        /* HUD Bottom Flutuante (Dynamic Island) */
+        #hud-bottom { 
+            position: absolute; bottom: calc(20px + env(safe-area-inset-bottom)); left: 20px; right: 20px;
+            padding: 16px 20px; z-index: 40; border-radius: 36px;
+        }
+        
+        .bottom-controls { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+        .stats-row { display: flex; justify-content: space-between; align-items: center; width: 100%; font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase;}
+
+        input[type=range] { width: 100%; -webkit-appearance: none; background: transparent; margin: 5px 0; }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; background: rgba(120,120,128,0.2); border-radius: 3px; transition: background 0.3s; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);}
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: var(--text-main); margin-top: -9px; box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.8); transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1); }
+        input[type=range]:active::-webkit-slider-thumb { transform: scale(1.15); }
+
+        .wpm-btn { background: var(--glass-panel); border: 0.5px solid var(--border-specular); color: var(--accent); font-weight: 800; font-size: 13px; cursor: pointer; letter-spacing: -0.5px; padding: 4px 12px; border-radius: 12px; box-shadow: var(--shadow-inset);}
+
+        /* Modais Floating Sheets iOS 26 */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4); z-index: 100;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
+        }
+        .modal-overlay.open { opacity: 1; pointer-events: auto; }
+        
+        .modal-content {
+            width: calc(100% - 40px); max-width: 400px; max-height: 80vh;
+            border-radius: 40px; display: flex; flex-direction: column;
+            transform: scale(0.92) translateY(20px); opacity: 0; 
+            transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.4s ease;
+            overflow: hidden; padding-bottom: env(safe-area-inset-bottom);
+        }
+        .modal-overlay.open .modal-content { transform: scale(1) translateY(0); opacity: 1; }
+        
+        .modal-header { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 0.5px solid var(--guide);}
+        .modal-header h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.5px;}
+        
+        #global-stats { padding: 14px 24px; background: var(--glass-panel); border-bottom: 0.5px solid var(--guide); display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.5px;}
+
+        #chapter-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; font-size: 16px; font-weight: 500; }
+        .chapter-item { padding: 18px 24px; border-bottom: 0.5px solid var(--guide); color: var(--text-dim); cursor: pointer; display: flex; justify-content: space-between; transition: background 0.2s; }
+        .chapter-item:active { background: var(--glass-panel); }
+        .chapter-item.active-chap { color: var(--accent); font-weight: 700; }
+
+        /* Controlos Internos */
+        .settings-body { padding: 0 24px 24px 24px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; margin-top: 15px;}
+        .setting-group { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 0.5px solid var(--guide); }
+        .setting-group:last-child { border-bottom: none; }
+        .setting-label { display: flex; flex-direction: column; }
+        .setting-label span:first-child { font-size: 16px; font-weight: 500; letter-spacing: -0.3px;}
+        .setting-desc { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+        
+        select { background: var(--glass-panel); color: var(--text-main); border: 0.5px solid var(--border-specular); padding: 8px 14px; border-radius: 12px; font-size: 15px; outline: none; -webkit-appearance: none; text-align: right; cursor: pointer; font-weight: 600; box-shadow: var(--shadow-inset);}
+
+        .segmented-control { display: flex; background: var(--glass-panel); box-shadow: var(--shadow-inset); border-radius: 12px; padding: 4px; border: 0.5px solid var(--border-specular); }
+        .segment-btn { padding: 8px 16px; font-size: 13px; border-radius: 10px; border: none; background: transparent; color: var(--text-dim); cursor: pointer; font-weight: 600; transition: all 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+        .segment-btn.active { background: var(--text-main); color: var(--bg-color); box-shadow: 0 3px 8px rgba(0,0,0,0.15); }
+
+        .btn-primary { background: var(--text-main); color: var(--bg-color); border: none; padding: 18px; border-radius: 20px; font-size: 16px; font-weight: 700; width: 100%; cursor: pointer; transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s; display: flex; justify-content: center; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(0,0,0,0.2);}
+        .btn-primary:active { transform: scale(0.96); opacity: 0.9;}
+
+        .section-title { font-size: 12px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin: 24px 0 8px 0; }
+
+        #file-input { display: none; }
+    </style>
+</head>
+<body data-align="center">
+    
+    <div id="ambient-bg"></div>
+
+    <div id="hud-top" class="liquid-glass">
+        <div id="current-chapter-title">A aguardar Livro</div>
+        <div style="display: flex; gap: 4px;">
+            <button class="icon-btn" onclick="toggleModal('chapters-modal')" aria-label="Índice">
+                <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <button class="icon-btn" onclick="toggleModal('settings-modal')" aria-label="Definições">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <div id="stage">
+        <div class="guide-line guide-top"></div>
+        <div class="guide-line guide-bottom"></div>
+
+        <div id="word-container">
+            <span class="segment prefix" id="txt-prefix"></span>
+            <span class="segment orp" id="txt-orp">Ler</span>
+            <span class="segment suffix" id="txt-suffix"></span>
+        </div>
+
+        <div id="context-view"></div>
+
+        <div id="zone-left" class="touch-zone" onclick="rewind()"></div>
+        <div id="zone-center" class="touch-zone" onclick="toggle()"></div>
+        <div id="zone-right" class="touch-zone" onclick="forward()"></div>
+    </div>
+
+    <div id="hud-bottom" class="liquid-glass">
+        <div class="bottom-controls">
+            <div class="stats-row">
+                <span id="meta-progress">0%</span>
+                <button class="wpm-btn" id="meta-wpm" onclick="toggleModal('wpm-modal')">350 WPM</button>
+                <span id="meta-time">-- min</span>
+            </div>
+            <input type="range" id="scrubber" min="0" value="0" step="1">
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal-overlay" onclick="if(event.target === this) toggleModal('settings-modal')">
+        <div class="modal-content liquid-glass">
+            <div class="modal-header">
+                <h3>Preferências</h3>
+                <button class="icon-btn" onclick="toggleModal('settings-modal')">
+                    <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="settings-body">
+                <button class="btn-primary" onclick="document.getElementById('file-input').click()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    Abrir Livro EPUB
+                </button>
+                
+                <div class="section-title">Aparência Visual</div>
+                
+                <div class="setting-group" style="border:none; padding-bottom: 0;">
+                    <div class="setting-label"><span>Posição do Texto</span></div>
+                    <div class="segmented-control" id="cfg-align">
+                        <button class="segment-btn active" data-val="center" onclick="setAlign('center')">Centro</button>
+                        <button class="segment-btn" data-val="edge" onclick="setAlign('edge')">Esquerda</button>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label"><span>Tema</span></label>
+                    <select id="cfg-theme" onchange="applySettings()">
+                        <option value="dark">Escuro</option>
+                        <option value="sepia">Sépia</option>
+                        <option value="light">Claro</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label"><span>Tipografia</span></label>
+                    <select id="cfg-font" onchange="applySettings()">
+                        <option value="'Menlo', monospace">Máquina (Mono)</option>
+                        <option value="system-ui, sans-serif">Livro (Sans)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label"><span>Tamanho Base</span></label>
+                    <select id="cfg-size" onchange="applySettings()">
+                        <option value="8vw">Pequeno</option>
+                        <option value="12vw" selected>Médio</option>
+                        <option value="16vw">Grande</option>
+                    </select>
+                </div>
+
+                <div class="section-title">Motor de Leitura</div>
+
+                <div class="setting-group">
+                    <div class="setting-label">
+                        <span>Blocos Longos</span>
+                        <span class="setting-desc">Respiro em palavras grandes</span>
+                    </div>
+                    <select id="cfg-plong" onchange="applySettings()">
+                        <option value="1.0">Desligado</option>
+                        <option value="1.2">Curta</option>
+                        <option value="1.5" selected>Média</option>
+                        <option value="2.0">Longa</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <div class="setting-label">
+                        <span>Fim de Frase</span>
+                        <span class="setting-desc">Após pontos finais (.?!)</span>
+                    </div>
+                    <select id="cfg-psent" onchange="applySettings()">
+                        <option value="1.0">Desligado</option>
+                        <option value="1.5">Curta</option>
+                        <option value="2.3" selected>Média</option>
+                        <option value="3.5">Longa</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <div class="setting-label">
+                        <span>Vírgulas</span>
+                        <span class="setting-desc">Após separadores (,;:)</span>
+                    </div>
+                    <select id="cfg-pcomma" onchange="applySettings()">
+                        <option value="1.0">Desligado</option>
+                        <option value="1.3">Curta</option>
+                        <option value="1.5" selected>Média</option>
+                        <option value="2.0">Longa</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <div class="setting-label">
+                        <span>Som de Fundo</span>
+                        <span class="setting-desc">Tique de sincronização</span>
+                    </div>
+                    <select id="cfg-audio" onchange="applySettings()">
+                        <option value="0" selected>Mutado</option>
+                        <option value="1">Ativo</option>
+                    </select>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="chapters-modal" class="modal-overlay" onclick="if(event.target === this) toggleModal('chapters-modal')">
+        <div class="modal-content liquid-glass">
+            <div class="modal-header">
+                <h3>Navegação</h3>
+                <button class="icon-btn" onclick="toggleModal('chapters-modal')">
+                    <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div id="global-stats">
+                <span id="global-pct">Geral: 0%</span>
+                <span id="global-time">Restante: -- h -- min</span>
+            </div>
+            <ul id="chapter-list">
+                <li class="chapter-item" style="text-align: center; color: var(--guide); border:none; margin-top: 20px;">Nenhum ficheiro carregado</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Novo Modal Analógico de Velocidade -->
+    <div id="wpm-modal" class="modal-overlay" onclick="if(event.target === this) toggleModal('wpm-modal')">
+        <div class="modal-content liquid-glass">
+            <div class="modal-header">
+                <h3>Velocidade (WPM)</h3>
+                <button class="icon-btn" onclick="toggleModal('wpm-modal')">
+                    <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div style="padding: 30px 24px 40px 24px; text-align: center;">
+                <div id="wpm-large-display" style="font-size: 46px; font-weight: 800; color: var(--accent); letter-spacing: -2px; margin-bottom: 24px; text-shadow: 0 4px 15px rgba(0,0,0,0.1);">350</div>
+                <input type="range" id="wpm-slider" min="100" max="1000" step="5" value="350" style="width: 100%; height: 8px;">
+                <div style="display: flex; justify-content: space-between; margin-top: 16px; font-size: 13px; color: var(--text-dim); font-weight: 700;">
+                    <span>100</span>
+                    <span>1000</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="file-input" accept=".epub">
+
+    <script>
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+        function playTick() {
+            if (Config.audio === "0" || !audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.frequency.value = 800; osc.type = 'sine';
+            gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.02);
+            osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.02);
+        }
+
+        const App = { data: [], pointer: 0, isPlaying: false, wpm: 350, timer: null, bookId: null, chapters: [], wakeLock: null };
+        const Config = { theme: 'dark', font: "'Menlo', monospace", size: '12vw', align: 'center', pLong: 1.5, pSent: 2.3, pComma: 1.5, pCap: 1.0, pNum: 1.6, audio: "0", wpm: 350 };
+
+        const UI = {
+            container: document.getElementById('word-container'), prefix: document.getElementById('txt-prefix'),
+            orp: document.getElementById('txt-orp'), suffix: document.getElementById('txt-suffix'),
+            context: document.getElementById('context-view'), scrubber: document.getElementById('scrubber'),
+            wpm: document.getElementById('meta-wpm'), prog: document.getElementById('meta-progress'),
+            time: document.getElementById('meta-time'), chapterTitle: document.getElementById('current-chapter-title'),
+            chapterList: document.getElementById('chapter-list'), globalPct: document.getElementById('global-pct'),
+            globalTime: document.getElementById('global-time'), wpmSlider: document.getElementById('wpm-slider'),
+            wpmLarge: document.getElementById('wpm-large-display')
+        };
+
+        async function requestWakeLock() { try { if ('wakeLock' in navigator) App.wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {} }
+        function releaseWakeLock() { if (App.wakeLock !== null) { App.wakeLock.release().then(() => { App.wakeLock = null; }); } }
+        document.addEventListener('visibilitychange', async () => { if (App.wakeLock !== null && document.visibilityState === 'visible' && App.isPlaying) await requestWakeLock(); });
+
+        function setAlign(val) {
+            document.querySelectorAll('#cfg-align .segment-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`#cfg-align .segment-btn[data-val="${val}"]`).classList.add('active');
+            Config.align = val; applySettings(true);
+        }
+
+        function loadSettings() {
+            const saved = JSON.parse(localStorage.getItem('rsvp_prefs') || '{}');
+            Object.assign(Config, saved); 
+            document.getElementById('cfg-theme').value = Config.theme;
+            document.getElementById('cfg-font').value = Config.font;
+            document.getElementById('cfg-size').value = Config.size;
+            document.getElementById('cfg-plong').value = Config.pLong;
+            document.getElementById('cfg-psent').value = Config.pSent;
+            document.getElementById('cfg-pcomma').value = Config.pComma;
+            document.getElementById('cfg-audio').value = Config.audio;
+            
+            App.wpm = Config.wpm;
+            UI.wpm.innerText = App.wpm + " WPM";
+            UI.wpmSlider.value = App.wpm;
+            UI.wpmLarge.innerText = App.wpm;
+
+            setAlign(Config.align || 'center'); applySettings(false);
+        }
+
+        function applySettings(save = true) {
+            Config.theme = document.getElementById('cfg-theme').value;
+            Config.font = document.getElementById('cfg-font').value;
+            Config.size = document.getElementById('cfg-size').value;
+            Config.pLong = parseFloat(document.getElementById('cfg-plong').value);
+            Config.pSent = parseFloat(document.getElementById('cfg-psent').value);
+            Config.pComma = parseFloat(document.getElementById('cfg-pcomma').value);
+            Config.audio = document.getElementById('cfg-audio').value;
+            
+            document.documentElement.setAttribute('data-theme', Config.theme);
+            document.body.setAttribute('data-align', Config.align);
+            document.documentElement.style.setProperty('--font-family', Config.font);
+            document.documentElement.style.setProperty('--font-size', Config.size);
+            
+            if(save) localStorage.setItem('rsvp_prefs', JSON.stringify(Config));
+            if(!App.isPlaying) render(); 
+        }
+
+        function toggleModal(id) {
+            const modal = document.getElementById(id);
+            const isOpen = modal.classList.contains('open');
+            if(!isOpen && App.isPlaying) pause();
+            if (id === 'chapters-modal' && !isOpen) { renderChapterList(); updateGlobalStats(); }
+            modal.classList.toggle('open');
+        }
+
+        document.getElementById('file-input').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            toggleModal('settings-modal'); 
+            UI.orp.innerText = "A carregar..."; UI.prefix.innerText = ""; UI.suffix.innerText = ""; 
+            UI.chapterTitle.innerText = "Processando matriz...";
+            App.bookId = file.name + "_" + file.size;
+            const reader = new FileReader();
+            reader.onload = (evt) => parseEpubSafely(evt.target.result);
+            reader.readAsArrayBuffer(file);
+        });
+
+        async function parseEpubSafely(buffer) {
+            const book = ePub(buffer); await book.ready;
+            App.data = []; App.chapters = [];
+            if (!book.spine || !book.spine.spineItems || book.spine.spineItems.length === 0) return;
+            let chapCounter = 1;
+
+            for (const item of book.spine.spineItems) {
+                try {
+                    const doc = await item.load(book.load.bind(book));
+                    if (!doc) continue;
+                    const textNode = doc.querySelector('body') || doc.documentElement;
+                    if (!textNode) continue;
+                    const cleanText = (textNode.textContent || "").replace(/\s+/g, ' ').trim();
+                    if (cleanText.length > 0) {
+                        let titleEl = doc.querySelector('h1, h2, h3, title');
+                        let title = titleEl ? titleEl.textContent.replace(/\s+/g, ' ').trim() : `Secção ${chapCounter}`;
+                        if (title.length > 35) title = title.substring(0, 35) + "..."; 
+                        App.chapters.push({ title: title, index: App.data.length });
+                        const tokens = cleanText.split(' ');
+                        tokens.push("///"); App.data = App.data.concat(tokens); chapCounter++;
+                    }
+                } catch(err) {} finally { item.unload(); }
+            }
+            if (App.data.length === 0) { UI.orp.innerText = "DRM Protegido"; return; }
+            const saved = localStorage.getItem(App.bookId);
+            App.pointer = saved ? Math.min(parseInt(saved), App.data.length - 1) : 0;
+            render(); updateHud();
+        }
+
+        function getCurrentChapterBounds() {
+            if (App.chapters.length === 0) return { start: 0, end: Math.max(0, App.data.length - 1), chapIndex: 0 };
+            let start = 0, end = App.data.length - 1, chapIndex = 0;
+            for (let i = App.chapters.length - 1; i >= 0; i--) {
+                if (App.pointer >= App.chapters[i].index) { start = App.chapters[i].index; chapIndex = i; break; }
+            }
+            if (chapIndex < App.chapters.length - 1) end = App.chapters[chapIndex + 1].index - 1;
+            return { start, end, chapIndex };
+        }
+
+        function updateGlobalStats() {
+            if (App.data.length === 0) return;
+            const pct = ((App.pointer / App.data.length) * 100).toFixed(1);
+            const totalMins = Math.ceil((App.data.length - App.pointer) / App.wpm);
+            UI.globalPct.innerText = `Geral: ${pct}%`;
+            UI.globalTime.innerText = `Faltam: ${Math.floor(totalMins / 60) > 0 ? Math.floor(totalMins / 60) + 'h ' : ''}${totalMins % 60}m`;
+        }
+
+        function renderChapterList() {
+            if (App.chapters.length === 0) return;
+            const bounds = getCurrentChapterBounds();
+            UI.chapterList.innerHTML = App.chapters.map((c, i) => `
+                <li class="chapter-item ${i === bounds.chapIndex ? 'active-chap' : ''}" onclick="jumpToChapter(${c.index})">
+                    <span>${c.title}</span>
+                </li>`).join('');
+            setTimeout(() => { const el = UI.chapterList.querySelector('.active-chap'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50);
+        }
+
+        function jumpToChapter(index) {
+            App.pointer = index; toggleModal('chapters-modal'); render(); updateHud(true); renderContext();
+            UI.context.classList.add('active'); UI.container.style.opacity = '0.05'; 
+        }
+
+        window.contextJump = function(index) {
+            if (index < 0 || index >= App.data.length) return;
+            App.pointer = index; render(); updateHud(false); renderContext(); 
+        };
+
+        function render() {
+            if (App.pointer >= App.data.length) { pause(); return; }
+            let raw = App.data[App.pointer];
+            if (raw === "///") raw = " "; 
+
+            if (Config.align === 'edge') {
+                UI.prefix.innerText = ""; UI.orp.innerText = raw; UI.suffix.innerText = ""; UI.container.style.transform = 'scale(1)';
+            } else {
+                const len = raw.length;
+                const cleanLen = raw.replace(/[.,;?!:)"']/g, '').length || len;
+                let centerIdx = Math.floor(cleanLen / 2);
+                if (cleanLen > 3 && cleanLen % 2 === 0) centerIdx -= 1;
+
+                UI.prefix.innerText = raw.slice(0, centerIdx); UI.orp.innerText = raw[centerIdx] || ""; UI.suffix.innerText = raw.slice(centerIdx + 1);
+                UI.container.style.transform = len > 10 ? `scale(${Math.max(0.40, 1 - ((len - 10) * 0.045))})` : 'scale(1)';
+            }
+        }
+
+        function renderContext() {
+            if(App.data.length === 0) return;
+            const bounds = getCurrentChapterBounds();
+            let html = "";
+            for(let i = Math.max(bounds.start, App.pointer - 18); i < Math.min(bounds.end + 1, App.pointer + 18); i++) {
+                if(App.data[i] === "///") continue;
+                html += i === App.pointer ? `<span class="context-word context-highlight">${App.data[i]}</span> ` : `<span class="context-word" onclick="contextJump(${i})">${App.data[i]}</span> `;
+            }
+            UI.context.innerHTML = html;
+        }
+
+        function loop() {
+            render(); playTick(); 
+            const word = App.data[App.pointer];
+            let ms = 60000 / App.wpm;
+
+            if (word === "///") ms *= 3.0; 
+            else if (word) {
+                if (word.length < 4) ms *= 0.8; else if (word.length > 8) ms *= Config.pLong;
+                if (/[.?!][)"']*$/.test(word)) ms *= Config.pSent;
+                else if (/[,;:][)"']*$/.test(word)) ms *= Config.pComma;
+            }
+
+            App.pointer++;
+            if (App.pointer % 50 === 0) localStorage.setItem(App.bookId, App.pointer);
+            if (App.pointer % 5 === 0) updateHud(false); 
+
+            if (App.pointer < App.data.length) App.timer = setTimeout(loop, ms);
+            else pause();
+        }
+
+        function toggle() { if (!App.data.length) { toggleModal('settings-modal'); return; } App.isPlaying ? pause() : play(); triggerFeedback('zone-center'); }
+
+        async function play() {
+            if (!App.isPlaying) {
+                App.isPlaying = true; initAudio(); await requestWakeLock(); 
+                UI.context.classList.remove('active'); UI.container.style.opacity = '1'; loop();
+            }
+        }
+
+        function pause() {
+            App.isPlaying = false; clearTimeout(App.timer); releaseWakeLock(); 
+            if(App.bookId) localStorage.setItem(App.bookId, App.pointer);
+            updateHud(true); renderContext(); UI.context.classList.add('active'); UI.container.style.opacity = '0.05'; 
+        }
+
+        function rewind() { if (!App.data.length) return; pause(); App.pointer = Math.max(getCurrentChapterBounds().start, App.pointer - 30); render(); updateHud(); triggerFeedback('zone-left'); renderContext(); }
+        function forward() { if (!App.data.length) return; pause(); App.pointer = Math.min(getCurrentChapterBounds().end, App.pointer + 30); render(); updateHud(); triggerFeedback('zone-right'); renderContext(); }
+
+        UI.wpmSlider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            App.wpm = val;
+            Config.wpm = val;
+            UI.wpmLarge.innerText = val;
+            UI.wpm.innerText = val + " WPM";
+            
+            const saved = JSON.parse(localStorage.getItem('rsvp_prefs') || '{}');
+            saved.wpm = val;
+            localStorage.setItem('rsvp_prefs', JSON.stringify(saved));
+            
+            if (!App.isPlaying) updateHud(false);
+        });
+
+        function updateHud(force = true) {
+            if(App.data.length === 0) return;
+            requestAnimationFrame(() => {
+                const b = getCurrentChapterBounds();
+                UI.scrubber.min = b.start; UI.scrubber.max = b.end; UI.scrubber.value = App.pointer;
+                UI.prog.innerText = `${(((App.pointer - b.start) / Math.max(1, b.end - b.start)) * 100).toFixed(0)}%`;
+                UI.time.innerText = Math.ceil((b.end - App.pointer) / App.wpm) + " min";
+                if (force || App.pointer % 20 === 0) if(App.chapters[b.chapIndex]) UI.chapterTitle.innerText = App.chapters[b.chapIndex].title;
+            });
+        }
+
+        function triggerFeedback(id) { const el = document.getElementById(id); if(!el) return; el.style.animation = 'none'; void el.offsetHeight; el.style.animation = 'flashAnim 0.15s ease-out'; }
+        UI.scrubber.addEventListener('input', (e) => { if (App.isPlaying) pause(); App.pointer = parseInt(e.target.value); render(); renderContext(); updateHud(false); });
+        document.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); toggle(); } if (e.code === 'ArrowLeft') rewind(); if (e.code === 'ArrowRight') forward(); });
+        
+        loadSettings();
+    </script>
+</body>
+</html>
