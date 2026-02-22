@@ -2,161 +2,63 @@
 <html lang="pt-BR" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Reader Pro">
-    <title>Speed Reader RSVP Liquid Glass</title>
+    <meta name="apple-mobile-web-app-title" content="Leitor Rápido">
+    
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0A84FF">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
-    <style>
-        :root[data-theme="dark"]  { --bg-color:#000; --text-dim:rgba(255,255,255,.55); --text-main:#FFF; --accent:#0A84FF; --guide:rgba(255,255,255,.1); --glass-base:rgba(30,30,35,.45); --glass-panel:rgba(50,50,55,.35); --border-specular:rgba(255,255,255,.15); --shadow-inset:inset 0 1px 1px rgba(255,255,255,.1); --bg-gradient:radial-gradient(circle at 20% 30%, #1a1a24 0%, transparent 50%), radial-gradient(circle at 80% 80%, #0d1b2a 0%, transparent 50%); }
-        :root[data-theme="sepia"] { --bg-color:#F4E8D1; --text-dim:#9C8F79; --text-main:#3D342B; --accent:#D06014; --guide:rgba(0,0,0,.05); --glass-base:rgba(250,243,227,.6); --glass-panel:rgba(255,255,255,.5); --border-specular:rgba(255,255,255,.6); --shadow-inset:inset 0 1px 2px rgba(255,255,255,.8); --bg-gradient:radial-gradient(circle at 20% 30%, #fbebd5 0%, transparent 50%), radial-gradient(circle at 80% 80%, #e8dbbc 0%, transparent 50%); }
-        :root[data-theme="light"]  { --bg-color:#F2F2F7; --text-dim:rgba(0,0,0,.5); --text-main:#000; --accent:#007AFF; --guide:rgba(0,0,0,.05); --glass-base:rgba(255,255,255,.6); --glass-panel:rgba(255,255,255,.5); --border-specular:rgba(255,255,255,.8); --shadow-inset:inset 0 1px 2px rgba(255,255,255,.9); --bg-gradient:radial-gradient(circle at 20% 30%, #fff 0%, transparent 50%), radial-gradient(circle at 80% 80%, #e2e2ec 0%, transparent 50%); }
-
-        * { box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-        body { background-color: var(--bg-color); color: var(--text-main); font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI", Roboto, sans-serif; margin: 0; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; position: relative; user-select: none; -webkit-user-select: none; transition: background-color .5s ease, color .5s ease; padding-top: env(safe-area-inset-top); }
-
-        #ambient-bg { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; z-index: -1; background-image: var(--bg-gradient); animation: ambientDrift 30s ease-in-out infinite alternate; opacity: .8; contain: paint; }
-        #ambient-bg.reading-mode { animation-play-state: paused; }
-        @keyframes ambientDrift { 0% { transform: translate(0,0) scale(1); } 100% { transform: translate(5%,5%) scale(1.1); } }
-        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
-
-        .liquid-glass { background: var(--glass-base); border: .5px solid var(--border-specular); box-shadow: var(--shadow-inset), 0 10px 30px rgba(0,0,0,.15); }
-        @supports (backdrop-filter: blur(1px)) { .liquid-glass { backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); } }
-
-        #hud-top { padding: 12px 20px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; z-index: 10; border-radius: 0 0 24px 24px; margin: 0 10px; transition: opacity .3s; }
-        body.is-reading #hud-top { opacity: .1; pointer-events: none; }
-        #current-chapter-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 15px; font-weight: 700; color: var(--text-dim); letter-spacing: -.2px; }
-        .hud-top-actions { display: flex; gap: 4px; }
-
-        .icon-btn { background: transparent; border: none; color: var(--text-main); padding: 8px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform .2s cubic-bezier(.32,.72,0,1), background .2s; }
-        .icon-btn:active { background: var(--glass-panel); transform: scale(.9); }
-        .icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-
-        #stage { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-direction: column; }
-        .guide-line { position: absolute; width: 2px; height: 12px; background: var(--text-dim); left: 50%; transform: translateX(-50%); border-radius: 2px; pointer-events: none; opacity: .3; }
-        .guide-top { top: 38%; } .guide-bottom { bottom: 38%; }
-
-        #word-container { font-size: clamp(2rem, var(--font-size, 11vw), 6rem); font-family: var(--font-family, 'Menlo', monospace); line-height: 1; white-space: nowrap; display: flex; align-items: baseline; will-change: transform; transition: opacity .3s ease, transform .05s linear; transform-origin: center center; pointer-events: none; width: 100%; justify-content: center; letter-spacing: -1px; text-shadow: 0 2px 10px rgba(0,0,0,.1); }
-        .segment { display: inline-block; transition: color .15s ease; }
-        .prefix, .suffix { width: 45vw; opacity: .85; }
-        .prefix { text-align: right; padding-right: 2px; color: var(--text-main); }
-        .suffix { text-align: left; padding-left: 2px; color: var(--text-main); }
-        .orp { color: var(--accent); font-weight: 700; width: auto; text-align: center; }
-
-        body[data-align="edge"] .guide-line, body[data-align="edge"] .prefix, body[data-align="edge"] .suffix { display: none; }
-        body[data-align="edge"] #word-container { justify-content: flex-start; padding-left: 10vw; width: auto; }
-        body[data-align="edge"] .orp { color: var(--text-main); font-weight: 500; text-align: left; }
-
-        #context-view { position: absolute; top: 55%; width: 90%; max-width: 500px; font-size: 1.15rem; line-height: 1.5; color: var(--text-dim); text-align: center; opacity: 0; pointer-events: none; transition: all .5s cubic-bezier(.32,.72,0,1); z-index: 30; transform: translateY(15px) scale(.98); }
-        #context-view.active { opacity: 1; pointer-events: auto; transform: translateY(0) scale(1); }
-        .context-word { cursor: pointer; padding: 2px 4px; border-radius: 8px; transition: color .2s; display: inline-block; }
-        .context-word:active { color: var(--accent); }
-        .context-highlight { color: var(--text-main); font-weight: 600; border-bottom: 2px solid var(--accent); }
-
-        .touch-zone { position: absolute; top: 0; bottom: 0; z-index: 20; cursor: pointer; }
-        #zone-left { left: 0; width: 30%; } #zone-center { left: 30%; width: 40%; } #zone-right { right: 0; width: 30%; }
-        .flash { animation: flashAnim .2s ease-out; }
-        @keyframes flashAnim { 0% { background: rgba(255,255,255,.05); } 100% { background: transparent; } }
-
-        #hud-bottom { position: absolute; bottom: calc(20px + env(safe-area-inset-bottom)); left: 20px; right: 20px; padding: 16px 20px; z-index: 40; border-radius: 36px; transition: opacity .3s, transform .3s; }
-        body.is-reading #hud-bottom { opacity: .1; transform: translateY(10px); pointer-events: none; }
-        .bottom-controls { display: flex; flex-direction: column; gap: 8px; }
-        .stats-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; }
-
-        input[type=range] { width: 100%; -webkit-appearance: none; background: transparent; margin: 5px 0; outline: none; }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; background: rgba(120,120,128,.2); border-radius: 3px; box-shadow: inset 0 1px 2px rgba(0,0,0,.1); }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: var(--text-main); margin-top: -9px; box-shadow: 0 4px 12px rgba(0,0,0,.4), inset 0 1px 1px rgba(255,255,255,.8); transition: transform .2s cubic-bezier(.32,.72,0,1); }
-        input[type=range]:active::-webkit-slider-thumb { transform: scale(1.15); }
-        .wpm-btn { background: var(--glass-panel); border: .5px solid var(--border-specular); color: var(--accent); font-weight: 800; font-size: 13px; cursor: pointer; padding: 4px 12px; border-radius: 12px; box-shadow: var(--shadow-inset); }
-
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .4s ease; }
-        .modal-overlay.open { opacity: 1; pointer-events: auto; }
-        .modal-content { width: calc(100% - 40px); max-width: 400px; max-height: 80vh; border-radius: 40px; display: flex; flex-direction: column; transform: scale(.92) translateY(20px); opacity: 0; transition: transform .5s cubic-bezier(.32,.72,0,1), opacity .4s ease; padding-bottom: env(safe-area-inset-bottom); overflow: hidden; }
-        .modal-overlay.open .modal-content { transform: scale(1) translateY(0); opacity: 1; }
-        .modal-header { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: .5px solid var(--guide); }
-        .modal-header h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -.5px; }
-
-        #global-stats { padding: 14px 24px; background: var(--glass-panel); border-bottom: .5px solid var(--guide); display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; text-transform: uppercase; }
-        #chapter-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; font-size: 16px; font-weight: 500; }
-        .chapter-item { padding: 18px 24px; border-bottom: .5px solid var(--guide); color: var(--text-dim); cursor: pointer; display: flex; justify-content: space-between; transition: background .2s; }
-        .chapter-item:hover { background: var(--glass-panel); }
-        .chapter-item.active-chap { color: var(--accent); font-weight: 700; }
-
-        .settings-body { padding: 0 24px 24px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; margin-top: 15px; }
-        .setting-group { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: .5px solid var(--guide); }
-        .setting-group:last-child { border-bottom: none; }
-        .setting-group--no-border { border: none; padding-bottom: 0; }
-        .setting-label { display: flex; flex-direction: column; }
-        .setting-label span:first-child { font-size: 16px; font-weight: 500; }
-        .setting-desc { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
-        select { background: var(--glass-panel); color: var(--text-main); border: .5px solid var(--border-specular); padding: 8px 14px; border-radius: 12px; font-size: 15px; outline: none; -webkit-appearance: none; text-align: right; font-weight: 600; box-shadow: var(--shadow-inset); }
-
-        .segmented-control { display: flex; background: var(--glass-panel); box-shadow: var(--shadow-inset); border-radius: 12px; padding: 4px; border: .5px solid var(--border-specular); }
-        .segment-btn { padding: 8px 16px; font-size: 13px; border-radius: 10px; border: none; background: transparent; color: var(--text-dim); font-weight: 600; transition: all .3s cubic-bezier(.32,.72,0,1); cursor: pointer; }
-        .segment-btn.active { background: var(--text-main); color: var(--bg-color); box-shadow: 0 3px 8px rgba(0,0,0,.15); }
-
-        .btn-primary { background: var(--text-main); color: var(--bg-color); border: none; padding: 18px; border-radius: 20px; font-size: 16px; font-weight: 700; width: 100%; display: flex; justify-content: center; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(0,0,0,.2); transition: transform .2s cubic-bezier(.32,.72,0,1); cursor: pointer; }
-        .btn-primary:active { transform: scale(.96); opacity: .9; }
-        .section-title { font-size: 12px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; margin: 24px 0 8px 0; }
-
-        .wpm-modal-body { padding: 30px 24px; text-align: center; }
-        .wpm-large-display { font-size: 46px; font-weight: 800; color: var(--accent); letter-spacing: -2px; margin-bottom: 24px; }
-        .wpm-range-labels { display: flex; justify-content: space-between; margin-top: 16px; font-size: 13px; color: var(--text-dim); font-weight: 700; }
-        #file-input { display: none; }
     
-        .icon-btn[aria-pressed="true"] { background: var(--glass-panel); color: var(--accent); }
-        body.focus-mode #hud-top,
-        body.focus-mode #hud-bottom { opacity: 0 !important; pointer-events: none !important; }
-        body.focus-mode > #btn-focus {
-            position: fixed;
-            top: calc(16px + env(safe-area-inset-top));
-            right: 16px; z-index: 200;
-            opacity: 0.25; pointer-events: auto;
-            transition: opacity .3s;
-            background: var(--glass-base);
-            border: .5px solid var(--border-specular);
-            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-        }
-        body.focus-mode > #btn-focus:hover,
-        body.focus-mode > #btn-focus:focus { opacity: 1; }
-    </style>
+    <title>Leitor Rápido (RSVP)</title>
+    
+    <!-- Bibliotecas externas com crossorigin -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Dyslexic:wght@400;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="styles.css">
 </head>
-<body data-align="center">
+<body>
+
     <div id="ambient-bg" aria-hidden="true"></div>
+
     <div id="hud-top" class="liquid-glass">
         <div id="current-chapter-title">A aguardar Livro</div>
         <div class="hud-top-actions">
-            <button class="icon-btn" id="btn-chapters" aria-label="Abrir navegação de capítulos">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            <button class="icon-btn" id="btn-chapters" aria-label="Abrir lista de capítulos">
+                <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
             </button>
-            <button class="icon-btn" id="btn-settings" aria-label="Abrir preferências">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            </button>
-            <button class="icon-btn" id="btn-focus" aria-label="Modo Foco (F)" aria-pressed="false">
-                <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
-            <button class="icon-btn" id="btn-accelerate" aria-label="Modo Aceleração" aria-pressed="false">
-                <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+            <button class="icon-btn" id="btn-settings" aria-label="Abrir configurações">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             </button>
         </div>
     </div>
+
     <div id="stage">
         <div class="guide-line guide-top" aria-hidden="true"></div>
         <div class="guide-line guide-bottom" aria-hidden="true"></div>
+        
+        <div class="empty-state" id="empty-state">
+            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+            <h3 style="margin: 0 0 8px 0; font-size: 1.2rem;">Nenhum livro carregado</h3>
+            <p style="margin: 0; font-size: 0.9rem;">Abra um arquivo EPUB/TXT ou arraste e solte aqui</p>
+        </div>
+
         <div id="word-container" aria-live="assertive" aria-atomic="true">
             <span class="segment prefix" id="txt-prefix"></span>
-            <span class="segment orp"    id="txt-orp">Ler</span>
+            <span class="segment orp" id="txt-orp">Ler</span>
             <span class="segment suffix" id="txt-suffix"></span>
         </div>
+        
         <div id="context-view" aria-label="Contexto da leitura"></div>
-        <div id="zone-left"   class="touch-zone" role="button" tabindex="0" aria-label="Voltar 30 palavras"></div>
-        <div id="zone-center" class="touch-zone" role="button" tabindex="0" aria-label="Pausar ou retomar leitura"></div>
-        <div id="zone-right"  class="touch-zone" role="button" tabindex="0" aria-label="Avançar 30 palavras"></div>
+        
+        <!-- Elementos convertidos de div para button para melhor acessibilidade nativa -->
+        <button id="zone-left" class="touch-zone" aria-label="Voltar 30 palavras"></button>
+        <button id="zone-center" class="touch-zone" aria-label="Pausar ou retomar leitura"></button>
+        <button id="zone-right" class="touch-zone" aria-label="Avançar 30 palavras"></button>
     </div>
+
     <div id="hud-bottom" class="liquid-glass">
         <div class="bottom-controls">
             <div class="stats-row">
@@ -168,381 +70,173 @@
         </div>
     </div>
 
-    <div id="settings-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-        <div class="modal-content liquid-glass">
-            <div class="modal-header">
-                <h3 id="settings-title">Preferências</h3>
-                <button class="icon-btn" id="btn-close-settings" aria-label="Fechar preferências"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-            </div>
-            <div class="settings-body">
-                <button class="btn-primary" id="btn-open-file" aria-label="Selecionar arquivo">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                    Abrir Arquivo (EPUB/TXT)
-                </button>
-                <div class="section-title" aria-hidden="true">Aparência</div>
-                <div class="setting-group setting-group--no-border">
-                    <div class="setting-label"><span>Alinhamento</span></div>
-                    <div class="segmented-control" id="cfg-align" role="group" aria-label="Alinhamento do texto">
-                        <button class="segment-btn active" data-val="center" aria-pressed="true">Centro</button>
-                        <button class="segment-btn"        data-val="edge"   aria-pressed="false">Esquerda</button>
-                    </div>
-                </div>
-                <div class="setting-group"><label class="setting-label" for="cfg-theme"><span>Tema</span></label><select id="cfg-theme"><option value="dark">Escuro</option><option value="sepia">Sépia</option><option value="light">Claro</option></select></div>
-                <div class="setting-group"><label class="setting-label" for="cfg-font"><span>Tipografia</span></label><select id="cfg-font"><option value="'Menlo', monospace">Mono</option><option value="system-ui, sans-serif">Sans</option></select></div>
-                <div class="setting-group"><label class="setting-label" for="cfg-size"><span>Tamanho</span></label><select id="cfg-size"><option value="8vw">Pequeno</option><option value="12vw" selected>Médio</option><option value="16vw">Grande</option></select></div>
-                <div class="section-title" aria-hidden="true">Motor Lógico</div>
-                <div class="setting-group"><div class="setting-label"><span>Palavras Longas</span><span class="setting-desc">Mais de 8 letras</span></div><select id="cfg-plong"><option value="1.0">Desligado</option><option value="1.2">Curto</option><option value="1.5">Médio</option></select></div>
-                <div class="setting-group"><div class="setting-label"><span>Fim de Frase</span><span class="setting-desc">Após (.?!)</span></div><select id="cfg-psent"><option value="1.0">Desligado</option><option value="1.5">Curto</option><option value="2.3">Médio</option></select></div>
-                <div class="setting-group"><div class="setting-label"><span>Vírgulas</span><span class="setting-desc">Após (,;:)</span></div><select id="cfg-pcomma"><option value="1.0">Desligado</option><option value="1.3">Curto</option><option value="1.5">Médio</option></select></div>
-                <div class="setting-group"><div class="setting-label"><span>Metrônomo</span><span class="setting-desc">Áudio Sync</span></div><select id="cfg-audio"><option value="0">Desligado</option><option value="1">Ligado</option></select></div>
-            </div>
-        </div>
-    </div>
-    <div id="chapters-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="chapters-title">
-        <div class="modal-content liquid-glass">
-            <div class="modal-header">
-                <h3 id="chapters-title">Navegação</h3>
-                <button class="icon-btn" id="btn-close-chapters" aria-label="Fechar navegação"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-            </div>
-            <div id="global-stats"><span id="global-pct">Geral: 0%</span><span id="global-time">Faltam: --m</span></div>
-            <ul id="chapter-list" role="listbox" aria-label="Lista de capítulos"><li class="chapter-item" style="justify-content:center;color:var(--guide);border:none">Vazio</li></ul>
-        </div>
-    </div>
     <div id="wpm-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="wpm-title">
         <div class="modal-content liquid-glass">
             <div class="modal-header">
                 <h3 id="wpm-title">Velocidade</h3>
-                <button class="icon-btn" id="btn-close-wpm" aria-label="Fechar ajuste de velocidade"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                <button class="icon-btn" id="btn-close-wpm" aria-label="Fechar">
+                    <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
             <div class="wpm-modal-body">
-                <div id="wpm-large-display" class="wpm-large-display" aria-live="polite">350</div>
-                <input type="range" id="wpm-slider" min="100" max="1000" step="5" value="350" aria-label="Velocidade em palavras por minuto">
+                <div class="wpm-large-display" id="wpm-large-display" aria-live="polite">350</div>
+                <input type="range" id="wpm-slider" min="100" max="1000" step="5" value="350" aria-label="WPM">
                 <div class="wpm-range-labels"><span>100</span><span>1000</span></div>
             </div>
         </div>
     </div>
-    <input type="file" id="file-input" accept=".epub,.txt" aria-label="Selecionar arquivo">
 
-    <script>
-    (function () {
-        'use strict';
-        const el = id => document.getElementById(id);
+    <div id="chapters-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="chapters-title">
+        <div class="modal-content liquid-glass">
+            <div class="modal-header">
+                <h3 id="chapters-title">Navegação</h3>
+                <button class="icon-btn" id="btn-close-chapters" aria-label="Fechar">
+                    <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div id="global-stats">
+                <span id="global-pct">Geral 0%</span>
+                <span id="global-time">Restante --m</span>
+            </div>
+            <ul id="chapter-list" role="listbox" aria-label="Lista de capítulos">
+                <li class="chapter-item" style="justify-content:center;color:var(--guide);border:none;">Vazio</li>
+            </ul>
+        </div>
+    </div>
 
-        const UI = {
-            cont: el('word-container'), pre: el('txt-prefix'), orp: el('txt-orp'), suf: el('txt-suffix'),
-            ctx: el('context-view'), scr: el('scrubber'), wpm: el('meta-wpm'), prog: el('meta-progress'),
-            time: el('meta-time'), chap: el('current-chapter-title'), list: el('chapter-list'),
-            gPct: el('global-pct'), gTime: el('global-time'), wSlide: el('wpm-slider'), wLarge: el('wpm-large-display'), bg: el('ambient-bg'),
-        };
+    <div id="settings-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="modal-content liquid-glass">
+            <div class="modal-header">
+                <h3 id="settings-title">Preferências</h3>
+                <button class="icon-btn" id="btn-close-settings" aria-label="Fechar">
+                    <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="settings-body">
+                <button class="btn-primary" id="btn-open-file">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="13" x2="12" y2="15"></line>
+                    </svg>
+                    Abrir Arquivo (EPUB/TXT)
+                </button>
 
-        const App = { data: [], ptr: 0, play: false, wpm: 350, timer: null, id: null, chaps: [], lock: null, accelerate: false, acc: 0, lastTick: 0, nextMs: 0 };
-        const Cfg = { theme: 'dark', font: "'Menlo', monospace", size: '12vw', align: 'center', pLong: 1.5, pSent: 2.3, pComma: 1.5, audio: '0' };
-        const CfgKeys = ['theme', 'font', 'size', 'pLong', 'pSent', 'pComma', 'audio'];
-        let aCtx;
+                <div class="section-title">Leitura Confortável</div>
+                
+                <div class="setting-group" style="border:none;padding-bottom:0;">
+                    <label class="setting-label" for="cfg-font"><span>Tipografia</span></label>
+                    <select id="cfg-font">
+                        <option value="system-ui, sans-serif">Sans (Padrão)</option>
+                        <option value="'Open Dyslexic', sans-serif">Open Dyslexic</option>
+                        <option value="Georgia, serif">Serif</option>
+                        <option value="Menlo, monospace">Mono</option>
+                    </select>
+                </div>
+                
+                <div class="setting-group">
+                    <label class="setting-label" for="cfg-size"><span>Tamanho</span></label>
+                    <select id="cfg-size">
+                        <option value="8vw">Pequeno</option>
+                        <option value="12vw" selected>Médio</option>
+                        <option value="16vw">Grande</option>
+                        <option value="20vw">Muito Grande</option>
+                    </select>
+                </div>
+                
+                <div class="setting-group">
+                    <label class="setting-label" for="cfg-spacing"><span>Espaçamento</span><span class="setting-desc">Entre palavras</span></label>
+                    <select id="cfg-spacing">
+                        <option value="2px">Compacto</option>
+                        <option value="4px" selected>Normal</option>
+                        <option value="8px">Espaçoso</option>
+                        <option value="12px">Muito Espaçoso</option>
+                    </select>
+                </div>
+                
+                <div class="setting-group">
+                    <label class="setting-label" for="cfg-lineheight"><span>Altura da Linha</span></label>
+                    <select id="cfg-lineheight">
+                        <option value="1">Compacta</option>
+                        <option value="1.4">Normal</option>
+                        <option value="1.8" selected>Confortável</option>
+                        <option value="2.2">Generosa</option>
+                    </select>
+                </div>
+                
+                <div class="setting-group">
+                    <label class="setting-label" for="cfg-column"><span>Largura da Coluna</span></label>
+                    <select id="cfg-column">
+                        <option value="350px">Estreita</option>
+                        <option value="500px" selected>Normal</option>
+                        <option value="650px">Larga</option>
+                        <option value="800px">Muito Larga</option>
+                    </select>
+                </div>
 
-        function initAudio() {
-            try { aCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { console.warn('Web Audio API indisponível:', e); }
-        }
-        function tick() {
-            if (Cfg.audio === '0' || !aCtx) return;
-            if (aCtx.state === 'suspended') { aCtx.resume(); return; }
-            const o = aCtx.createOscillator(), g = aCtx.createGain();
-            o.connect(g); g.connect(aCtx.destination);
-            o.frequency.value = 800; o.type = 'sine';
-            g.gain.setValueAtTime(.02, aCtx.currentTime);
-            g.gain.exponentialRampToValueAtTime(.001, aCtx.currentTime + .02);
-            o.start(aCtx.currentTime); o.stop(aCtx.currentTime + .02);
-        }
+                <div class="section-title">Aparência</div>
+                
+                <div class="setting-group" style="border:none;padding-bottom:0;">
+                    <div class="setting-label"><span>Tema</span></div>
+                    <div class="segmented-control" id="cfg-theme-seg" role="group" aria-label="Tema visual">
+                        <button class="segment-btn active" data-val="dark" aria-pressed="true">Escuro</button>
+                        <button class="segment-btn" data-val="oled" aria-pressed="false">OLED</button>
+                        <button class="segment-btn" data-val="sepia" aria-pressed="false">Sépia</button>
+                        <button class="segment-btn" data-val="light" aria-pressed="false">Claro</button>
+                    </div>
+                </div>
+                
+                <div class="setting-group">
+                    <div class="setting-label"><span>Alinhamento</span></div>
+                    <div class="segmented-control" id="cfg-align" role="group" aria-label="Alinhamento do texto">
+                        <button class="segment-btn active" data-val="center" aria-pressed="true">Centro</button>
+                        <button class="segment-btn" data-val="edge" aria-pressed="false">Esquerda</button>
+                    </div>
+                </div>
 
-        async function lockReq() { try { if (navigator.wakeLock) App.lock = await navigator.wakeLock.request('screen'); } catch (e) {} }
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden') {
-                // Aba oculta: parar animações CSS para poupar GPU/bateria
-                UI.bg.style.animationPlayState = 'paused';
-                if (App.play && App.timer) { cancelAnimationFrame(App.timer); App.timer = null; }
-            } else {
-                // Aba visível: retomar
-                UI.bg.style.animationPlayState = '';
-                App.lastTick = 0; App.acc = 0; // evita time-jump
-                if (App.lock && App.play) lockReq();
-                if (App.play && !App.timer) App.timer = requestAnimationFrame(loop);
-            }
-        });
+                <div class="section-title">Motor Lógico</div>
+                
+                <div class="setting-group">
+                    <div class="setting-label"><span>Palavras Longas</span><span class="setting-desc">Mais de 8 letras</span></div>
+                    <select id="cfg-plong">
+                        <option value="1.0">Desligado</option>
+                        <option value="1.2">Curto</option>
+                        <option value="1.5" selected>Médio</option>
+                    </select>
+                </div>
+                
+                <div class="setting-group">
+                    <div class="setting-label"><span>Fim de Frase</span><span class="setting-desc">Após . ? !</span></div>
+                    <select id="cfg-psent">
+                        <option value="1.0">Desligado</option>
+                        <option value="1.5">Curto</option>
+                        <option value="2.3" selected>Médio</option>
+                    </select>
+                </div>
+                
+                <div class="setting-group">
+                    <div class="setting-label"><span>Vírgulas</span><span class="setting-desc">Após ,</span></div>
+                    <select id="cfg-pcomma">
+                        <option value="1.0">Desligado</option>
+                        <option value="1.3">Curto</option>
+                        <option value="1.5" selected>Médio</option>
+                    </select>
+                </div>
+                
+                <div class="setting-group">
+                    <div class="setting-label"><span>Metrônomo</span><span class="setting-desc">Áudio Sync</span></div>
+                    <select id="cfg-audio">
+                        <option value="0" selected>Desligado</option>
+                        <option value="1">Ligado</option>
+                    </select>
+                </div>
+                
+            </div>
+        </div>
+    </div>
 
-        function setAlign(v) {
-            document.querySelectorAll('.segment-btn').forEach(b => {
-                b.classList.toggle('active', b.dataset.val === v);
-                b.setAttribute('aria-pressed', b.dataset.val === v ? 'true' : 'false');
-            });
-            Cfg.align = v; applySettings(true);
-        }
+    <input type="file" id="file-input" accept=".epub,.txt">
 
-        function loadSettings() {
-            const stored = JSON.parse(localStorage.getItem('rsvp_cfg') || '{}');
-            if (!stored.theme) stored.theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-            Object.assign(Cfg, stored);
-            CfgKeys.forEach(k => { const input = el(`cfg-${k.toLowerCase()}`); if (input) input.value = Cfg[k]; });
-            App.wpm = Cfg.wpm || 350; UI.wpm.innerText = App.wpm + ' WPM'; UI.wSlide.value = UI.wLarge.innerText = App.wpm;
-            setAlign(Cfg.align || 'center'); applySettings(false);
-        }
+    <div class="notification" id="notification" aria-live="polite"></div>
 
-        function applySettings(save = true) {
-            CfgKeys.forEach(k => { const inp = el(`cfg-${k.toLowerCase()}`); if (inp) Cfg[k] = inp.value; });
-            ['pLong', 'pSent', 'pComma'].forEach(k => Cfg[k] = parseFloat(Cfg[k]));
-            document.documentElement.setAttribute('data-theme', Cfg.theme);
-            document.body.setAttribute('data-align', Cfg.align);
-            document.documentElement.style.setProperty('--font-family', Cfg.font);
-            document.documentElement.style.setProperty('--font-size', Cfg.size);
-            if (save) localStorage.setItem('rsvp_cfg', JSON.stringify({ ...Cfg, wpm: App.wpm }));
-            if (!App.play) render();
-        }
-
-        function toggleModal(id) {
-            const m = el(id);
-            const opening = !m.classList.contains('open');
-            if (opening && App.play) pause();
-            if (id === 'chapters-modal' && opening) { renderList(); updateGStats(); }
-            m.classList.toggle('open');
-            // Acessibilidade: mover foco
-            if(opening) { const btn = m.querySelector('.icon-btn'); if(btn) setTimeout(()=>btn.focus(), 50); }
-        }
-        document.querySelectorAll('.modal-overlay').forEach(overlay => { overlay.addEventListener('click', e => { if (e.target === overlay) toggleModal(overlay.id); }); });
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => toggleModal(m.id)); });
-
-        // --- Lógica de Arquivo (Restaurada e Otimizada) ---
-        el('file-input').addEventListener('change', async e => {
-            if (!e.target.files[0]) return;
-            const file = e.target.files[0];
-            toggleModal('settings-modal');
-            UI.orp.innerText = 'A carregar...'; UI.pre.innerText = UI.suf.innerText = '';
-            App.id = file.name + "|" + file.size;
-
-            if (file.name.toLowerCase().endsWith('.txt')) {
-                const text = await file.text();
-                parseTxt(text);
-            } else {
-                const r = new FileReader();
-                r.onload = ev => parseEpub(ev.target.result);
-                r.readAsArrayBuffer(file);
-            }
-        });
-
-        function parseTxt(text) {
-            App.data = []; App.chaps = [];
-            // Filtra espaços vazios e normaliza quebras de linha
-            const words = text.replace(/\r\n/g, '\n').split(/\s+/).filter(w => w.length > 0);
-            if (!words.length) { UI.orp.innerText = 'Arquivo vazio'; return; }
-            
-            App.data = words;
-            App.chaps.push({ title: 'Documento Completo', idx: 0 });
-            
-            // Tenta restaurar progresso ou inicia do zero
-            App.ptr = Math.min(parseInt(localStorage.getItem(App.id) || 0), App.data.length - 1);
-            render(); updHud();
-        }
-
-        async function parseEpub(buf) {
-            const b = ePub(buf); await b.ready;
-            App.data = []; App.chaps = [];
-            if (!b.spine?.spineItems?.length) return;
-            let cC = 1;
-            for (let i of b.spine.spineItems) {
-                try {
-                    const d = await i.load(b.load.bind(b)); if (!d) continue;
-                    const t = d.querySelector('h1,h2,title');
-                    App.chaps.push({ title: (t ? t.textContent : `Secção ${cC}`).replace(/\s+/g, ' ').trim().substring(0, 35), idx: App.data.length });
-                    const els = d.querySelectorAll('p,h1,h2,h3,li,blockquote');
-                    (els.length ? Array.from(els) : [d.body]).forEach(e => {
-                        const txt = (e.textContent || '').replace(/—/g, ' — ').replace(/\s+/g, ' ').trim();
-                        if (txt) App.data.push(...txt.split(/\s+/).filter(Boolean), '//');
-                    });
-                    App.data.push('///'); cC++;
-                } catch (err) { console.error('Erro ao ler capítulo', err); } finally { i.unload(); }
-            }
-            if (!App.data.length) { UI.orp.innerText = 'DRM Protegido'; return; }
-            App.ptr = Math.min(parseInt(localStorage.getItem(App.id) || 0), App.data.length - 1);
-            render(); updHud();
-        }
-
-        const getBounds = () => {
-            if (!App.chaps.length) return { s: 0, e: Math.max(0, App.data.length - 1), c: 0 };
-            let s = 0, e = App.data.length - 1, c = 0;
-            for (let i = App.chaps.length - 1; i >= 0; i--) { if (App.ptr >= App.chaps[i].idx) { s = App.chaps[i].idx; c = i; break; } }
-            if (c < App.chaps.length - 1) e = App.chaps[c + 1].idx - 1;
-            return { s, e, c };
-        };
-
-        function updateGStats() {
-            if (!App.data.length) return;
-            const t = Math.ceil((App.data.length - App.ptr) / App.wpm);
-            UI.gPct.innerText = `Geral: ${((App.ptr / App.data.length) * 100).toFixed(1)}%`;
-            UI.gTime.innerText = `Faltam: ${Math.floor(t / 60) > 0 ? Math.floor(t / 60) + 'h ' : ''}${t % 60}m`;
-        }
-
-        function renderList() {
-            const b = getBounds(); UI.list.innerHTML = '';
-            App.chaps.forEach((c, i) => {
-                const li = document.createElement('li');
-                li.className = 'chapter-item' + (i === b.c ? ' active-chap' : '');
-                li.setAttribute('role', 'option'); li.setAttribute('aria-selected', i === b.c);
-                const span = document.createElement('span'); span.textContent = c.title;
-                li.appendChild(span);
-                li.addEventListener('click', () => {
-                    App.ptr = c.idx; toggleModal('chapters-modal'); render(); updHud(true); renderCtx();
-                    UI.ctx.classList.add('active'); UI.cont.style.opacity = .05;
-                });
-                UI.list.appendChild(li);
-            });
-            setTimeout(() => UI.list.querySelector('.active-chap')?.scrollIntoView({ block: 'center' }), 50);
-        }
-
-        function jump(i) { if (i >= 0 && i < App.data.length) { App.ptr = i; render(); updHud(false); renderCtx(); } }
-
-        function render() {
-            if (App.ptr >= App.data.length) { pause(); return; }
-            let r = App.data[App.ptr];
-            if (r === '///' || r === '//') r = ' ';
-            if (Cfg.align === 'edge') {
-                UI.pre.innerText = UI.suf.innerText = ''; UI.orp.innerText = r; UI.cont.style.transform = 'scale(1)';
-            } else {
-                const cLen = r.replace(/[.,;?!:)"']/g, '').length || r.length;
-                const cIdx = Math.floor(cLen / 2) - (cLen > 3 && cLen % 2 === 0 ? 1 : 0);
-                UI.pre.innerText = r.slice(0, cIdx); UI.orp.innerText = r[cIdx] || ''; UI.suf.innerText = r.slice(cIdx + 1);
-                UI.cont.style.transform = r.length > 10 ? `scale(${Math.max(.4, 1 - ((r.length - 10) * .045))})` : 'scale(1)';
-            }
-        }
-
-        function renderCtx() {
-            if (!App.data.length) return;
-            const b = getBounds();
-            const start = Math.max(b.s, App.ptr - 18), end = Math.min(b.e + 1, App.ptr + 18);
-            UI.ctx.innerHTML = '';
-            for (let i = start; i < end; i++) {
-                if (App.data[i] === '///' || App.data[i] === '//') continue;
-                const span = document.createElement('span');
-                span.className = 'context-word' + (i === App.ptr ? ' context-highlight' : '');
-                span.textContent = App.data[i];
-                span.addEventListener('click', () => jump(i));
-                UI.ctx.appendChild(span); UI.ctx.appendChild(document.createTextNode(' '));
-            }
-        }
-
-        function applyWpm(val) {
-            App.wpm = val; UI.wpm.innerText = val + ' WPM'; UI.wSlide.value = UI.wLarge.innerText = val;
-            localStorage.setItem('rsvp_cfg', JSON.stringify({ ...Cfg, wpm: val }));
-            if (!App.play) updHud(false);
-        }
-                function loop(ts) {
-            if (!App.play) { App.timer = null; return; }
-            if (!App.lastTick) App.lastTick = ts;
-            App.acc += ts - App.lastTick; App.lastTick = ts;
-            if (App.acc >= App.nextMs) { App.acc -= App.nextMs; advance(); }
-            if (App.play) App.timer = requestAnimationFrame(loop);
-        }
-        function advance() {
-            if (App.ptr >= App.data.length) { pause(); return; }
-            render(); tick();
-            const w = App.data[App.ptr];
-            let ms = 60000 / App.wpm;
-            if (w === '///') ms *= 3; else if (w === '//') ms *= 1.8;
-            else if (w) {
-                if (w.length < 4) ms *= .8; else if (w.length > 8) ms *= Cfg.pLong;
-                ms *= /[.?!]["')]*$/.test(w) ? Cfg.pSent : (/[,;:]["')]*$/.test(w) ? Cfg.pComma : 1);
-            }
-            if (App.accelerate && App.ptr % 100 === 0) { App.wpm = Math.min(App.wpm + 5, 1000); applyWpm(App.wpm); }
-            App.nextMs = ms; App.ptr++;
-            if (App.ptr % 50 === 0) localStorage.setItem(App.id, App.ptr);
-            if (App.ptr % 5 === 0) updHud(false);
-        }
-
-        function toggle() { if (!App.data.length) { toggleModal('settings-modal'); return; } App.play ? pause() : play(); triggerFB('zone-center'); }
-        async function play() {
-            if (App.play) return;
-            App.play = true; if (!aCtx) initAudio();
-            UI.bg.style.willChange = 'auto'; // animação parada na leitura, libera camada GPU
-            await lockReq();
-            App.lastTick = 0; App.acc = 0; App.nextMs = 0;
-            document.body.classList.add('is-reading'); UI.bg.classList.add('reading-mode');
-            UI.ctx.classList.remove('active'); UI.cont.style.opacity = 1;
-            App.timer = requestAnimationFrame(loop);
-        }
-        function pause() {
-            App.play = false; if (App.timer) { cancelAnimationFrame(App.timer); App.timer = null; } if (App.lock) App.lock.release().then(() => App.lock = null);
-            document.body.classList.remove('is-reading'); UI.bg.classList.remove('reading-mode');
-            UI.bg.style.willChange = 'transform'; // retoma camada GPU para animação idle
-            if (App.id) localStorage.setItem(App.id, App.ptr);
-            updHud(true); renderCtx(); UI.ctx.classList.add('active'); UI.cont.style.opacity = .05;
-        }
-
-        function move(dir) {
-            if (!App.data.length) return; pause();
-            const b = getBounds();
-            App.ptr = dir < 0 ? Math.max(b.s, App.ptr - 30) : Math.min(b.e, App.ptr + 30);
-            render(); updHud(); triggerFB(dir < 0 ? 'zone-left' : 'zone-right'); renderCtx();
-        }
-        const rewind = () => move(-1), forward = () => move(1);
-
-        function updHud(fc = true) {
-            if (!App.data.length) return;
-            requestAnimationFrame(() => {
-                const b = getBounds();
-                UI.scr.min = b.s; UI.scr.max = b.e; UI.scr.value = App.ptr;
-                UI.prog.innerText = `${(((App.ptr - b.s) / Math.max(1, b.e - b.s)) * 100).toFixed(0)}%`;
-                UI.time.innerText = Math.ceil((b.e - App.ptr) / App.wpm) + 'm';
-                if (fc || App.ptr % 20 === 0) if (App.chaps[b.c]) UI.chap.innerText = App.chaps[b.c].title;
-            });
-        }
-
-        function triggerFB(id) { const e = el(id); if (e) { e.style.animation = 'none'; void e.offsetHeight; e.style.animation = 'flashAnim .15s ease-out'; } }
-
-        // Events
-        el('btn-chapters').addEventListener('click', () => toggleModal('chapters-modal'));
-        el('btn-settings').addEventListener('click', () => toggleModal('settings-modal'));
-        el('btn-close-settings').addEventListener('click', () => toggleModal('settings-modal'));
-        el('btn-close-chapters').addEventListener('click', () => toggleModal('chapters-modal'));
-        el('btn-close-wpm').addEventListener('click', () => toggleModal('wpm-modal'));
-        el('btn-open-file').addEventListener('click', () => el('file-input').click()); // ID corrigido
-        el('meta-wpm').addEventListener('click', () => toggleModal('wpm-modal'));
-
-        el('zone-left').addEventListener('click', rewind);
-        el('zone-center').addEventListener('click', toggle);
-        el('zone-right').addEventListener('click', forward);
-        el('zone-left').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') rewind(); });
-        el('zone-center').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') toggle(); });
-        el('zone-right').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') forward(); });
-
-        document.querySelectorAll('#cfg-align .segment-btn').forEach(btn => btn.addEventListener('click', () => setAlign(btn.dataset.val)));
-        document.querySelectorAll('#cfg-theme, #cfg-font, #cfg-size, #cfg-plong, #cfg-psent, #cfg-pcomma, #cfg-audio').forEach(sel => sel.addEventListener('change', () => applySettings()));
-
-        UI.wSlide.addEventListener('input', e => { applyWpm(parseInt(e.target.value)); });
-        UI.scr.addEventListener('input', e => { if (App.play) pause(); App.ptr = parseInt(e.target.value); render(); renderCtx(); updHud(false); });
-
-        document.addEventListener('keydown', e => {
-            if (document.querySelector('.modal-overlay.open')) return;
-            if (e.code === 'Space') { e.preventDefault(); toggle(); }
-            else if (e.code === 'ArrowLeft') rewind(); else if (e.code === 'ArrowRight') forward();
-            else if (e.code === 'KeyF') toggleFocus();
-        });
-
-
-        const _focusBtn = el('btn-focus');
-        const _focusBtnParent = _focusBtn.parentElement;
-        function toggleFocus() {
-            const active = document.body.classList.toggle('focus-mode');
-            _focusBtn.setAttribute('aria-pressed', active);
-            if (active) { document.body.appendChild(_focusBtn); }
-            else { _focusBtnParent.appendChild(_focusBtn); }
-        }
-        _focusBtn.addEventListener('click', toggleFocus);
-        el('btn-accelerate').addEventListener('click', () => {
-            App.accelerate = !App.accelerate;
-            el('btn-accelerate').setAttribute('aria-pressed', App.accelerate);
-        });
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW:', e));
-        }
-                loadSettings();
-    })();
-    </script>
+<script src="app.js"></script>
 </body>
 </html>

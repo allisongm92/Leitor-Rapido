@@ -1,8 +1,8 @@
-/* Speed Reader RSVP — Service Worker v1
+/* Speed Reader RSVP — Service Worker v2
    Local: cache-first | CDN: network-first com fallback
 */
-const CACHE = 'rsvp-v1';
-const LOCAL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
+const CACHE = 'rsvp-v2';
+const LOCAL = ['./', './index.html', './styles.css', './app.js', './manifest.json', './icon-192.png', './icon-512.png'];
 const CDN   = [
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js',
   'https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js'
