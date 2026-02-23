@@ -35,6 +35,63 @@
     let activeModal = null; // para focus trap
     let focusableElements = []; // dentro do modal atual
     
+    // --- PERSISTÊNCIA DO LIVRO (INDEXEDDB) ---
+    const DB_NAME = 'LeitorRapidoDB';
+    const STORE_NAME = 'livros';
+
+    function initDB() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(DB_NAME, 1);
+            req.onupgradeneeded = e => {
+                if (!e.target.result.objectStoreNames.contains(STORE_NAME)) {
+                    e.target.result.createObjectStore(STORE_NAME);
+                }
+            };
+            req.onsuccess = e => resolve(e.target.result);
+            req.onerror = e => reject(e.target.error);
+        });
+    }
+
+    async function saveBookToDB() {
+        if (!App.id || App.data.length === 0) return;
+        try {
+            const db = await initDB();
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).put({ 
+                id: App.id, 
+                data: App.data, 
+                chaps: App.chaps 
+            }, 'current_book');
+        } catch(e) { 
+            console.error('Erro ao salvar livro:', e); 
+        }
+    }
+
+    async function loadBookFromDB() {
+        try {
+            const db = await initDB();
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const req = tx.objectStore(STORE_NAME).get('current_book');
+            req.onsuccess = () => {
+                const book = req.result;
+                if (book && book.data && book.data.length > 0) {
+                    App.id = book.id;
+                    App.data = book.data;
+                    App.chaps = book.chaps;
+                    
+                    App.ptr = Math.max(0, Math.min(parseInt(localStorage.getItem(App.id) || 0), App.data.length - 1));
+                    
+                    document.body.classList.add('has-file');
+                    render(); 
+                    updHud();
+                    showNotification('Sessão anterior restaurada!', 'success');
+                }
+            };
+        } catch(e) { 
+            console.error('Erro ao restaurar o livro:', e); 
+        }
+    }
+
     // --- ÁUDIO ---
     function initAudio() {
         try { aCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
@@ -134,14 +191,12 @@
             setupFocusTrap(id);
         } else {
             releaseFocusTrap();
-            // retorna foco ao botão que abriu (exemplo: volta para o botão de capítulos ou configurações)
             if (id === 'settings-modal') el('btn-settings')?.focus();
             else if (id === 'chapters-modal') el('btn-chapters')?.focus();
             else if (id === 'wpm-modal') el('meta-wpm')?.focus();
         }
     }
 
-    // Listener para manter foco dentro do modal (focus trap)
     document.addEventListener('keydown', e => {
         if (!activeModal) return;
         
@@ -200,8 +255,6 @@
     });
 
     // --- CARREGAMENTO DE ARQUIVOS ---
-    
-    // Drag and Drop
     document.addEventListener('dragover', e => { e.preventDefault(); document.body.style.opacity = '0.7'; });
     document.addEventListener('dragleave', e => { e.preventDefault(); document.body.style.opacity = '1'; });
     document.addEventListener('drop', async e => {
@@ -230,7 +283,6 @@
             r.readAsArrayBuffer(file);
         }
     }
-
     
     el('file-input').addEventListener('change', async (e) => {
         if (!e.target.files[0]) return;
@@ -239,7 +291,6 @@
         await handleFileLoad(e.target.files[0]);
     });
 
-
     function parseTxt(text) {
         App.data = []; App.chaps = [];
         const words = text.replace(/\n/g, ' ').split(' ').filter(w => w.length > 0);
@@ -247,6 +298,7 @@
         App.data.push(...words);
         App.chaps.push({ title: "Documento Completo", idx: 0 });
         App.ptr = Math.max(0, Math.min(parseInt(localStorage.getItem(App.id) || 0), App.data.length - 1));
+        saveBookToDB();
         render(); updHud();
     }
 
@@ -263,9 +315,8 @@
         const totalChaps = b.spine.spineItems.length;
         
         for (let i of b.spine.spineItems) {
-            // Feedback de progresso
             UI.orp.innerText = `Carregando capítulo ${cC} de ${totalChaps}...`;
-            await new Promise(resolve => setTimeout(resolve, 0)); // permite atualização da UI
+            await new Promise(resolve => setTimeout(resolve, 0));
             
             try {
                 const d = await i.load(b.load.bind(b));
@@ -291,6 +342,7 @@
         }
         if (!App.data.length) { showNotification("DRM Protegido ou Vazio", "error"); document.body.classList.remove("has-file"); UI.orp.innerText = "Protegido"; return; }
         App.ptr = Math.max(0, Math.min(parseInt(localStorage.getItem(App.id) || 0), App.data.length - 1));
+        saveBookToDB();
         render(); updHud();
     }
 
@@ -387,7 +439,7 @@
     async function advance() {
         if (App.ptr >= App.data.length) { pause(); return; }
         render(); 
-        await tick(); // aguarda o áudio se houver
+        await tick(); 
         
         const w = App.data[App.ptr];
         let ms = 60000 / App.wpm;
@@ -468,26 +520,26 @@
     });
 
     document.addEventListener('keydown', e => {
-        if (document.querySelector('.modal-overlay.open')) return; // já tratado no focus trap
+        if (document.querySelector('.modal-overlay.open')) return;
         if (e.code === 'Space') { e.preventDefault(); toggle(); }
         else if (e.code === 'ArrowLeft') rewind();
         else if (e.code === 'ArrowRight') forward();
     });
 
-    // Salvar ao fechar a aba
     window.addEventListener('beforeunload', () => {
         if (App.id && App.data.length > 0) {
             localStorage.setItem(App.id, App.ptr);
         }
     });
 
-    // Adiciona listeners para selects (exceto theme/align que são tratados separadamente)
     CfgKeys.forEach(k => {
         const i = el(`cfg-${k}`);
         if (i && !['theme','align'].includes(k)) i.addEventListener('change', () => applySettings());
     });
 
+    // --- INICIALIZAÇÃO ---
     loadSettings();
+    loadBookFromDB();
 
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js').catch(err => console.debug('SW:', err));
