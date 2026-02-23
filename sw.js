@@ -11,19 +11,12 @@ const CDN   = [
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(c =>
-      Promise.allSettled([c.addAll(LOCAL), c.addAll(CDN)])
+      // CORREÇÃO: Promise.all garante que se um arquivo falhar, a instalação falha.
+      // Isso evita um PWA "zumbi" que parece funcionar mas quebra offline.
+      Promise.all([c.addAll(LOCAL), c.addAll(CDN)])
     )
   );
   self.skipWaiting();
-});
-
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(ks =>
-      Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', e => {
