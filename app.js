@@ -265,7 +265,11 @@
         }
     });
 
-    async function handleFileLoad(file) {
+async function handleFileLoad(file) {
+        // SEGURANÇA: Para qualquer leitura em andamento e reseta o estado
+        if (App.play) pause();
+        App.ptr = 0;
+        
         document.body.classList.add('has-file');
         UI.orp.innerText = "A carregar..."; UI.pre.innerText = ""; UI.suf.innerText = "";
         App.id = file.name + file.size;
@@ -402,7 +406,7 @@
         render(); updHud(false); renderCtx();
     }
 
-    function render() {
+function render() {
         if (App.ptr >= App.data.length) return pause();
         let r = App.data[App.ptr];
         if (!r || !r.trim()) r = "—";
@@ -410,12 +414,23 @@
         if (Cfg.align === 'edge') {
             UI.pre.innerText = ""; UI.suf.innerText = ""; UI.orp.innerText = r;
         } else {
-            const cLen = r.replace(/[.,?!]/g, "").length;
+            // LÓGICA CORRIGIDA: Ignora pontuação inicial para o cálculo do centro
+            const match = r.match(/^[\W_]*/); // Captura pontuação no início (ex: "(", "¿", "-")
+            const prefixLen = match ? match[0].length : 0;
+            
+            // Remove pontuação para calcular o tamanho real da palavra
+            const cleanWord = r.replace(/[.,?!:;"'()\[\]{}]/g, ""); 
+            const cLen = cleanWord.length;
+            
             let cIdx = Math.floor(cLen / 2);
             if (cLen > 3 && cLen < 20) cIdx = Math.max(0, cIdx - 1);
-            UI.pre.innerText = r.slice(0, cIdx);
-            UI.orp.innerText = r[cIdx] || "";
-            UI.suf.innerText = r.slice(cIdx + 1);
+            
+            // O índice absoluto é o deslocamento da pontuação + o centro da palavra limpa
+            const absoluteIdx = prefixLen + cIdx;
+
+            UI.pre.innerText = r.slice(0, absoluteIdx);
+            UI.orp.innerText = r[absoluteIdx] || "";
+            UI.suf.innerText = r.slice(absoluteIdx + 1);
         }
     }
 
@@ -436,10 +451,14 @@
         }
     }
 
-    async function advance() {
+async function advance() {
         if (App.ptr >= App.data.length) { pause(); return; }
         render(); 
         await tick(); 
+        
+        // SEGURANÇA: Verifica se os dados ainda existem após a pausa assíncrona do tick()
+        // Isso impede o crash se o usuário trocou de arquivo durante o "bip"
+        if (!App.data || App.data.length === 0) return pause();
         
         const w = App.data[App.ptr];
         let ms = 60000 / App.wpm;
