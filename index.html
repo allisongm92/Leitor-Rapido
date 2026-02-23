@@ -17,9 +17,15 @@
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js" crossorigin="anonymous"></script>
     <link href="https://fonts.googleapis.com/css2?family=Open+Dyslexic:wght@400;700&display=swap" rel="stylesheet">
     
+    <!-- PWA Update: notifica o usuário quando há nova versão disponível -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@pwabuilder/pwaupdate"></script>
+
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+
+    <!-- Componente de atualização do PWA -->
+    <pwa-update></pwa-update>
 
     <div id="ambient-bg" aria-hidden="true"></div>
 
